@@ -1,0 +1,14 @@
+{
+  "name": "kavach",
+  "version": "0.1.0",
+  "description": "Live Telugu scam-call shield built on Gnani Prisma + Timbre",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "test": "node test.js"
+  },
+  "dependencies": {
+    "puppeteer-core": "^25.16.0",
+    "ws": "^8.18.0"
+  }
+}

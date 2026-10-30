@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kavach</title>
+<style>
+  :root { --bg:#0e1116; --card:#171c24; --text:#e8ecf1; --mute:#8b95a5; --ok:#2ecc71; --warn:#f5a623; --bad:#ff4d4f; --line:#262d38; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { margin:0; font-size:28px; } .sub { color:var(--mute); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:16px; }
+  .meter { height:28px; background:#232a35; border-radius:14px; overflow:hidden; }
+  .bar { height:100%; width:0; background:var(--ok); transition:width .5s, background .5s; }
+  .score { display:flex; justify-content:space-between; margin-top:8px; font-weight:600; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; }
+  button { background:#2b5cff; color:#fff; border:0; border-radius:8px; padding:10px 16px; font-size:15px; cursor:pointer; }
+  button.alt { background:#2a3240; } button:disabled { opacity:.5; cursor:default; }
+  #feed { max-height:260px; overflow:auto; }
+  .line { padding:6px 0; border-bottom:1px solid var(--line); } .line:last-child { border:0; }
+  .chip { display:inline-block; background:#3a2230; color:#ff9aa2; border-radius:20px; padding:2px 10px; margin:4px 6px 0 0; font-size:13px; }
+  #alert { display:none; background:#3b1517; border-color:var(--bad); }
+  #alert h2 { margin:0 0 4px; color:var(--bad); }
+  #status { color:var(--mute); font-size:13px; }
+  pre { white-space:pre-wrap; margin:0; font:13px/1.5 ui-monospace,monospace; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🛡️ Kavach</h1>
+  <p class="sub">Live scam-call shield · కవచ్ · Gnani Prisma listens, Timbre warns</p>
+
+  <div id="alert" class="card" role="alert"><h2>⚠️ SCAM DETECTED / ఇది మోసం</h2><div id="alertText"></div></div>
+
+  <div class="card">
+    <div class="meter"><div id="bar" class="bar"></div></div>
+    <div class="score"><span id="verdict">Safe</span><span><span id="score">0</span> / 100</span></div>
+    <div id="chips"></div>
+  </div>
+
+  <div class="card">
+    <div class="btns">
+      <button id="start">🎙️ Start listening (put call on speaker)</button>
+      <button id="stop" class="alt" disabled>Stop &amp; report</button>
+    </div>
+    <div id="status">Idle</div>
+  </div>
+
+  <div class="card">
+    <strong>Live transcript</strong>
+    <div id="feed"></div>
+  </div>
+
+  <div class="card">
+    <strong>Demo without a microphone</strong>
+    <p class="sub" style="margin:4px 0 10px">Feeds scripted scammer lines through the same risk engine.</p>
+    <button id="sim" class="alt">▶ Play scripted scam call</button>
+  </div>
+
+  <div class="card" id="reportCard" style="display:none"><strong>Family report</strong><pre id="report"></pre></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let ws, ctx, stream, node, wsReady;
+const SCRIPT = [
+  'Hello, main CBI officer bol raha hoon, mee Aadhaar number tho oka parcel lo drugs dorikayi.',
+  'Mimmalni digital arrest chesam, video call lo undandi, line cut cheyakandi.',
+  'Ee vishayam evarikee cheppakandi, mee family ki kuda cheppakoodadu.',
+  'Verification kosam mee account ki vachina OTP ventane cheppandi.',
+  'లేదంటే గంటలో అరెస్ట్ చేస్తాం. సేఫ్ అకౌంట్ కి డబ్బు ట్రాన్స్‌ఫర్ చేయండి.',
+];
+
+function connect() {
+  ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  wsReady = new Promise((res) => (ws.onopen = res));
+  ws.onmessage = (e) => onMsg(JSON.parse(e.data));
+  ws.onclose = () => ($('status').textContent = 'Disconnected');
+}
+
+function onMsg(m) {
+  if (m.type === 'status') $('status').textContent = m.msg;
+  else if (m.type === 'speech') $('status').textContent = 'Hearing speech…';
+  else if (m.type === 'transcript') {
+    const d = document.createElement('div'); d.className = 'line'; d.textContent = m.text;
+    for (const s of m.newSignals) { const c = document.createElement('span'); c.className = 'chip'; c.textContent = s.label; d.append(c); $('chips').append(c.cloneNode(true)); }
+    $('feed').append(d); $('feed').scrollTop = 1e9;
+    setScore(m.score);
+  } else if (m.type === 'alert') {
+    $('alert').style.display = 'block'; $('alertText').textContent = m.text;
+    if (m.audio) new Audio('data:audio/wav;base64,' + m.audio).play().catch(() => {});
+    else { const u = new SpeechSynthesisUtterance(m.text); u.lang = 'te-IN'; speechSynthesis.speak(u); }
+  } else if (m.type === 'report') {
+    $('reportCard').style.display = 'block';
+    const r = m.report;
+    $('report').textContent = `Verdict: ${r.verdict} (${r.finalScore}/100)\n\nSignals:\n` +
+      (r.signals.map((s) => ` • ${s.label} ×${s.times}`).join('\n') || ' none') +
+      `\n\nTimeline:\n` + r.timeline.map((t) => `[${t.t.slice(11, 19)}] ${t.score}  ${t.text}`).join('\n');
+  }
+}
+
+function setScore(s) {
+  $('bar').style.width = s + '%';
+  $('bar').style.background = s >= 60 ? 'var(--bad)' : s >= 30 ? 'var(--warn)' : 'var(--ok)';
+  $('score').textContent = s;
+  $('verdict').textContent = s >= 60 ? 'LIKELY SCAM' : s >= 30 ? 'Suspicious' : 'Safe';
+}
+
+$('start').onclick = async () => {
+  connect(); await wsReady; ws.send(JSON.stringify({ type: 'start' }));
+  // echoCancellation off: we WANT to hear the phone's speaker.
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: true, channelCount: 1 } });
+  ctx = new AudioContext({ sampleRate: 16000 });
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([`
+    class P extends AudioWorkletProcessor {
+      constructor(){ super(); this.buf = new Int16Array(512); this.n = 0; }
+      process(i){ const ch = i[0][0]; if(!ch) return true;
+        for (let k=0;k<ch.length;k++){ this.buf[this.n++] = Math.max(-1,Math.min(1,ch[k]))*32767;
+          if(this.n===512){ this.port.postMessage(this.buf.slice().buffer); this.n=0; } }
+        return true; } }
+    registerProcessor('pcm', P);`], { type: 'text/javascript' })));
+  node = new AudioWorkletNode(ctx, 'pcm');
+  node.port.onmessage = (e) => ws.readyState === 1 && ws.send(e.data);
+  ctx.createMediaStreamSource(stream).connect(node);
+  $('start').disabled = true; $('stop').disabled = false; $('status').textContent = 'Listening…';
+};
+
+$('stop').onclick = () => {
+  ws.send(JSON.stringify({ type: 'stop' }));
+  stream?.getTracks().forEach((t) => t.stop()); ctx?.close();
+  $('start').disabled = false; $('stop').disabled = true;
+};
+
+$('sim').onclick = async () => {
+  if (!ws || ws.readyState !== 1) { connect(); await wsReady; }
+  $('sim').disabled = true;
+  for (const line of SCRIPT) { ws.send(JSON.stringify({ type: 'simulate', text: line })); await new Promise((r) => setTimeout(r, 2500)); }
+  ws.send(JSON.stringify({ type: 'stop' })); $('sim').disabled = false;
+};
+</script>
+</body>
+</html>

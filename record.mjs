@@ -1,0 +1,28 @@
+import puppeteer from 'puppeteer-core';
+import fs from 'node:fs';
+const browser = await puppeteer.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 900, height: 1100 });
+await page.evaluateOnNewDocument(() => {
+  const A = window.Audio;
+  window.Audio = function (src) { window.__wavSrc = src; window.__alertAt = performance.now(); return new A(src); };
+  window.__t0 = performance.now();
+});
+await page.goto('http://localhost:3000');
+const rec = await page.screencast({ path: 'demo-silent.mp4' });
+const t0 = Date.now();
+await new Promise(r => setTimeout(r, 2000));
+await page.click('#sim');
+await page.waitForFunction(() => window.__wavSrc, { timeout: 60000 });
+const alertMs = await page.evaluate(() => window.__alertAt - window.__t0);
+console.log('alert at ms since load', alertMs);
+const src = await page.evaluate(() => window.__wavSrc);
+fs.writeFileSync('alert.wav', Buffer.from(src.split(',')[1], 'base64'));
+await page.waitForFunction(() => getComputedStyle(document.getElementById('reportCard')).display !== 'none', { timeout: 60000 });
+await new Promise(r => setTimeout(r, 4000));
+await page.evaluate(() => window.scrollTo(0, 0));
+await new Promise(r => setTimeout(r, 1500));
+await rec.stop();
+console.log('total s', (Date.now() - t0) / 1000);
+fs.writeFileSync('alert-ms.txt', String(Math.round(alertMs)));
+await browser.close();
