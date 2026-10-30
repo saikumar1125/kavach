@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>How Kavach works</title>
+<style>
+:root{--bg:#0e1116;--card:#171c24;--line:#2a3340;--mute:#8b95a5;--text:#e8ecf1;--hi:#2b5cff;--bad:#ff4d4f;--ok:#2ecc71}
+*{box-sizing:border-box}body{margin:0;width:1280px;height:720px;background:var(--bg);color:var(--text);font:20px/1.45 system-ui,"Nirmala UI",sans-serif;overflow:hidden}
+h1{margin:28px 48px 4px;font-size:36px}.sub{margin:0 48px;color:var(--mute)}
+.flow{display:flex;gap:14px;margin:30px 48px 0;align-items:stretch}
+.box{flex:1;background:var(--card);border:2px solid var(--line);border-radius:14px;padding:16px;opacity:.45;transition:.4s;min-height:150px}
+.box b{display:block;font-size:19px;margin-bottom:6px}.box small{color:var(--mute);font-size:15px;display:block}
+.box.on{opacity:1;border-color:var(--hi);box-shadow:0 0 0 4px rgba(43,92,255,.2);transform:translateY(-6px)}
+.box.on.red{border-color:var(--bad);box-shadow:0 0 0 4px rgba(255,77,79,.2)}
+.arrow{align-self:center;color:var(--mute);font-size:26px}
+#detail{margin:34px 48px 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 28px;height:270px;font-size:22px}
+#detail .k{color:var(--mute);font-size:15px;letter-spacing:.08em;text-transform:uppercase}
+.chip{display:inline-block;background:#3a2230;color:#ff9aa2;border-radius:20px;padding:2px 12px;margin:6px 6px 0 0;font-size:17px}
+.meter{height:24px;background:#232a35;border-radius:12px;overflow:hidden;margin:10px 0}.bar{height:100%;width:0;background:var(--ok);transition:width 1.6s,background 1.6s}
+.slide{display:none}.slide.on{display:block}
+code{background:#0b0e13;padding:2px 8px;border-radius:6px;font-size:19px}
+</style></head><body>
+<h1>🛡️ Kavach — how it works</h1><p class="sub">A live scam-call shield for Telugu, built on Gnani Prisma and Timbre</p>
+<div class="flow">
+ <div class="box" id="b0"><b>1 · Phone call</b><small>Call on speaker. Browser mic captures it.</small></div><div class="arrow">›</div>
+ <div class="box" id="b1"><b>2 · Prisma STT</b><small>Live Telugu transcript, code-mixed speech</small></div><div class="arrow">›</div>
+ <div class="box" id="b2"><b>3 · Risk engine</b><small>Scores scam signals as they pile up</small></div><div class="arrow">›</div>
+ <div class="box red" id="b3"><b>4 · Timbre TTS</b><small>Spoken Telugu warning at 60 / 100</small></div><div class="arrow">›</div>
+ <div class="box" id="b4"><b>5 · Report</b><small>Summary the family can read</small></div>
+</div>
+<div id="detail">
+ <div class="slide on" id="s-1"><div class="k">The problem</div><p>Digital-arrest and fake-KYC scam calls target elderly and rural Indians in their own language. The victim only learns it was a scam after the money is gone. No tool listens during the call and warns them in Telugu.</p></div>
+ <div class="slide" id="s0"><div class="k">Step 1 · Listen</div><p>The browser captures the speaker's sound at 16 kHz and cuts it into small <code>1024-byte</code> frames, one every 32 ms. A small Node server holds the Gnani API key, so it never reaches the browser.</p></div>
+ <div class="slide" id="s1"><div class="k">Step 2 · Prisma speech-to-text</div><p>The server streams frames to Prisma over a WebSocket. Prisma detects where each sentence ends and returns Telugu text for it.</p><p style="color:#9fe0b0">“డిజిటల్ అరెస్ట్ చేశాం, కాల్ కట్ చేయకండి”</p></div>
+ <div class="slide" id="s2"><div class="k">Step 3 · Risk engine</div><p>Each sentence is checked for scam signals. Every new signal raises the meter.</p><div class="meter"><div class="bar" id="bar"></div></div><span class="chip">Claims to be CBI</span><span class="chip">Digital arrest</span><span class="chip">Keep it secret</span><span class="chip">Asks for OTP</span></div>
+ <div class="slide" id="s3"><div class="k">Step 4 · Timbre text-to-speech</div><p>When risk crosses 60 out of 100, Kavach speaks a calm Telugu warning on the same speaker:</p><p style="color:#ff9aa2;font-size:26px">ఇది మోసం. వెంటనే కాల్ కట్ చేయండి.</p></div>
+ <div class="slide" id="s4"><div class="k">Step 5 · Family report</div><p><b>Verdict: LIKELY SCAM (100/100)</b><br>Signals: CBI claim, digital arrest, secrecy, OTP demand, urgency<br>A timestamped timeline of every sentence, for the family to read.</p></div>
+</div>
+<script>
+let cur=-1;
+window.setStep=(n)=>{document.querySelectorAll('.slide').forEach(e=>e.classList.remove('on'));document.getElementById('s'+n).classList.add('on');
+ document.querySelectorAll('.box').forEach((b,i)=>b.classList.toggle('on',i===n));
+ if(n===2){document.getElementById('bar').style.width='0';setTimeout(()=>{const b=document.getElementById('bar');b.style.width='100%';b.style.background='var(--bad)'},200)}};
+</script></body></html>
